@@ -16,7 +16,7 @@ class My_BERT:
 
     def __init__(self, pair=True, model_name='bert-base-cased', max_len=256, aug=False, clf=False):
         self.device = torch.device(
-            'cuda:5' if torch.cuda.is_available() else 'cpu')
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
         self.CONFIG = {
             'A_train_p': './data/task1/train.csv',
             'A_dev_p': './data/task1/dev.csv',
@@ -162,7 +162,11 @@ class My_BERT:
                     input_ids=b_input_ids, token_type_ids=b_types, attention_mask=b_input_mask)
             logits = outputs[0]
             # Move logits and labels to CPU
-            pred.extend(logits.detach().cpu().numpy())
+            logits = logits.detach().cpu().numpy()
+            if self.clf:
+                pred.extend(np.argmax(logits, axis=1))
+            else:
+                pred.extend(logits)
         
         return pred
 
