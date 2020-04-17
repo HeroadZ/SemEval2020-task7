@@ -177,9 +177,14 @@ class My_BERT:
         _, test_l = util.Read_data(
             self.CONFIG['A_test_p'] if task == 'A' else self.CONFIG['B_test_p']).reader(task=task, pair=self.pair)
         if task == 'A':
-            print('{} model task A RMSE = {:.5f}'.format(pretrained[:-3] if pretrained else 'this model', util.rmse_A(test_l, pred)))
+            res = util.rmse_A(test_l, pred)
+            print('{} model task A RMSE = {:.5f}'.format(
+                pretrained[:-3] if pretrained else 'this model', res))
         else:
             if not self.clf:
                 pred = util.to_label(pred, len(test_l))
+            res = accuracy_score(test_l, pred)
             print('{} model task B accuracy = {:.5f}'.format(
-                pretrained[:-3] if pretrained else 'this model', accuracy_score(test_l, pred)))
+                pretrained[:-3] if pretrained else 'this model', res))
+        return round(res, 5)
+

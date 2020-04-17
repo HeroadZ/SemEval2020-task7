@@ -73,7 +73,9 @@ class NB_SVM:
 
     def evalute(self):
         if self.task == 'A':
-            print('NB-SVM model task A RMSE: %.5f' % util.rmse_A(self.test_l, self.predict()))
+            res = util.rmse_A(self.test_l, self.predict())
+            print('NB-SVM model task A RMSE: %.5f' % res)
         else:
-            print('NB-SVM model task B accuracy: %.5f' %
-                  accuracy_score(self.test_l, util.to_label(self.predict(), len(self.test_l))))
+            res = accuracy_score(self.test_l, util.to_label(self.predict(), len(self.test_l)))
+            print('NB-SVM model task B accuracy: %.5f' % res)
+        return round(res, 5)

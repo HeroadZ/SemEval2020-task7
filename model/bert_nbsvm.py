@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score
 
 class Bert_NBSVM:
 
-    def __init__(self, task='A', best_bert='Bert_pair_regress_1epochs_8bs.pt'):
+    def __init__(self, task='A', best_bert='Bert_pair_regress_1epochs_8bs.pt', bert_weight=0.91, nbsvm_weight=0.09):
         self.task = task
         self.CONFIG = {
             'pair_max_len': 160,
@@ -15,8 +15,8 @@ class Bert_NBSVM:
         }
         self.best_bert = best_bert
         self.pair = True if 'pair' in best_bert else False
-        self.bert_weight = 0.8
-        self.nbsvm_weight = 0.2
+        self.bert_weight = bert_weight
+        self.nbsvm_weight = nbsvm_weight
     
     def predict(self):
         nb_svm_pred = NB_SVM(task=self.task).train().predict()
@@ -34,8 +34,11 @@ class Bert_NBSVM:
         _, test_l = util.Read_data(
             self.CONFIG['A_test_p'] if self.task == 'A' else self.CONFIG['B_test_p']).reader(task=self.task, pair=self.pair)
         if self.task == 'A':
+            res = util.rmse_A(test_l, pred)
             print('{0}*{1} + {2}*nbsvm model task A RMSE = {3:.5f}'.format(
-                self.bert_weight, self.best_bert[:-3], self.nbsvm_weight, util.rmse_A(test_l, pred)))
+                self.bert_weight, self.best_bert[:-3], self.nbsvm_weight, res))
         else:
+            res = accuracy_score(test_l, pred)
             print('{0}*{1} + {2}*nbsvm model task B accuracy = {3:.5f}'.format(
-                self.bert_weight, self.best_bert[:-3], self.nbsvm_weight, accuracy_score(test_l, pred)))
+                self.bert_weight, self.best_bert[:-3], self.nbsvm_weight, res))
+        return round(res, 5)

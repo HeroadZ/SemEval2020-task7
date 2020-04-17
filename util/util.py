@@ -2,6 +2,18 @@ import json, pandas as pd, numpy as np, time, datetime, pickle, random, copy, to
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.svm import SVR
 from sklearn.metrics import accuracy_score
+import os
+from model.bert import My_BERT
+from model.NB_SVM import NB_SVM
+from model.bert_nbsvm import Bert_NBSVM
+import pickle
+
+
+CONFIG = {
+    'pair_max_len': 160,
+    'single_max_len': 96,  # max length for train, dev, test dataset is 74
+}
+
 
 class Read_data:
 
@@ -124,10 +136,11 @@ def baseline():
     B_test = pd.read_csv('./data/task2/truth_task_2.csv')
     pred = np.full(len(B_test['label']),
                    B_train['label'].value_counts().idxmax())
-    print('Subtask A baseline RMSE: %.5f' % rmse_A(
-        A_test.meanGrade, np.mean(A_train.meanGrade)))
-    print('Subtask B baseline accuracy: {}'.format(
-        accuracy_score(B_test.label, pred)))
+    base_A = rmse_A(A_test.meanGrade, np.mean(A_train.meanGrade))
+    base_B = accuracy_score(B_test.label, pred)
+    print('Subtask A baseline RMSE: %.5f' % base_A)
+    print('Subtask B baseline accuracy: {}'.format(base_B))
+    return round(base_A, 5), round(base_B, 5)
 
 def data_aug(path):
     s, l = [], []
@@ -142,3 +155,125 @@ def gpu_info():
     if torch.cuda.device_count() > 0:
         for i in range(torch.cuda.device_count()):
             print('cuda {}: {}'.format(i, torch.cuda.get_device_name(i)))
+
+
+def print_table(res=None, task='A'):
+    if res is None:
+        print('no data to show')
+        return
+    header = ['epochs', 'bs=32', 'bs=16', 'bs=8', 'bs=4']
+    column = ['1epochs','2epochs', '3epochs', '4epochs']
+    row_format = "{:>15}" * len(header)
+    info = 'A RMSE' if task == 'A' else 'B accuracy'
+    print('task {0} results:'.format(info))
+    print(row_format.format(*header))
+    N = len(column)
+    for i in range(N):
+        print(row_format.format(column[i], *[res[j]
+                                             for j in range(i*N, (i+1)*N)]))
+
+
+def get_res(tag, pair=True, max_len=CONFIG['pair_max_len'], task='A', aug=False, clf=False):
+    # for pair regress
+    if not os.path.exists(os.getcwd() +'/pretrained'):
+        raise ValueError('no pretrained model files, please train first!')
+    pretrains = os.listdir(os.getcwd()+'/pretrained/' + tag)
+    model = My_BERT(pair=pair, max_len=max_len, aug=aug, clf=clf)
+    res = [model.evaluate(pretrained=p, task=task) for p in pretrains]
+    del model
+    return res
+
+
+def get_A():
+    return {
+        'pair_regress': get_res('pair', pair=True, max_len=CONFIG['pair_max_len'], task='A'),
+        'single_regress': get_res('single', pair=False, max_len=CONFIG['single_max_len'], task='A'),
+        'single+aug': get_res('aug', pair=False, max_len=CONFIG['single_max_len'], task='A', aug=True),
+        'nbsvm': NB_SVM(task='A').train().evalute(),
+        'pair+nbsvm': Bert_NBSVM(task='A', best_bert='Bert_pair_regress_1epochs_4bs.pt').evaluate(),
+    }
+
+
+def get_B():
+    return {
+        'pair_regress': get_res('pair', pair=True, max_len=CONFIG['pair_max_len'], task='B'),
+        'single_regress': get_res('single', pair=False, max_len=CONFIG['single_max_len'], task='B'),
+        'single+aug': get_res('aug', pair=False, max_len=CONFIG['single_max_len'], task='B', aug=True),
+        'nbsvm': NB_SVM(task='B').train().evalute(),
+        'pair+nbsvm': Bert_NBSVM(task='B', best_bert='Bert_pair_regress_1epochs_4bs.pt').evaluate(),
+        'clf': get_res('clf', pair=False, max_len=CONFIG['pair_max_len'], task='B', clf=True),
+    }
+
+
+def save_res():
+    res = {
+        'A': get_A(),
+        'B': get_B(),
+    }
+    with open('results.pickle', 'wb') as f:
+        pickle.dump(res, f, protocol=pickle.HIGHEST_PROTOCOL)
+    return res
+
+def show_A_res():
+    if os.path.isfile('results.pickle'):
+        with open('results.pickle', 'rb') as f:
+            res = pickle.load(f)
+    else:
+        res = save_res()
+    
+    print('results for task A:')
+    print('baseline: {}'.format(baseline()[0]))
+    print('BERT pair:')
+    print_table(res['A']['pair_regress'], task='A')
+    print('BERT single:')
+    print_table(res['A']['single_regress'], task='A')
+    print('BERT single aug:')
+    print_table(res['A']['single+aug'], task='A')
+    print('NBSVM: {0}'.format(res['A']['nbsvm']))
+    print('best BERT pair + NBSVM: {0}'.format(res['A']['pair+nbsvm']))
+
+    return res['A']
+
+
+def show_B_res():
+    if os.path.isfile('results.pickle'):
+        with open('results.pickle', 'rb') as f:
+            res = pickle.load(f)
+    else:
+        res = save_res()
+
+    print('results for task B:')
+    print('baseline: {}'.format(baseline()[1]))
+    print('BERT pair:')
+    print_table(res['B']['pair_regress'], task='B')
+    print('BERT single:')
+    print_table(res['B']['pair_regress'], task='B')
+    print('BERT single aug:')
+    print_table(res['B']['single+aug'], task='B')
+    print('NBSVM: {0}'.format(res['B']['nbsvm']))
+    print('best BERT pair + NBSVM: {0}'.format(res['B']['pair+nbsvm']))
+    print('BERT pair classfier:')
+    print_table(res['B']['clf'], task='B')
+    return res['B']
+
+def show_res():
+    show_A_res()
+    show_B_res()
+
+def train_bert(pair=False, model='bert-base-cased', max_len=CONFIG['single_max_len'], aug=False, clf=False):
+    for i in range(1, 5):
+            for j in [32, 16, 8, 4]:
+                My_BERT(
+                    pair=pair, model_name=model, max_len=max_len, aug=aug, clf=clf).fineT(epochs=i, bs=j, verbose=False)
+
+
+def train():
+    # training part, training file will be saved in pretrained folder
+    # for bert pair regressor training
+    train_bert(pair=True, max_len=CONFIG['pair_max_len'])
+    # for bert single regressor training
+    train_bert(pair=False, max_len=CONFIG['single_max_len'])
+    # for bert single regressor + data augmentation training
+    train_bert(pair=False, max_len=CONFIG['single_max_len'], aug=True)
+    # for bert classifier
+    train_bert(pair=False, max_len=CONFIG['pair_max_len'], clf=True)
