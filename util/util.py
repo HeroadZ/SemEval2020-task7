@@ -138,8 +138,6 @@ def baseline():
                    B_train['label'].value_counts().idxmax())
     base_A = rmse_A(A_test.meanGrade, np.mean(A_train.meanGrade))
     base_B = accuracy_score(B_test.label, pred)
-    print('Subtask A baseline RMSE: %.5f' % base_A)
-    print('Subtask B baseline accuracy: {}'.format(base_B))
     return round(base_A, 5), round(base_B, 5)
 
 def data_aug(path):
@@ -247,7 +245,7 @@ def show_B_res():
     print('BERT pair:')
     print_table(res['B']['pair_regress'], task='B')
     print('BERT single:')
-    print_table(res['B']['pair_regress'], task='B')
+    print_table(res['B']['single_regress'], task='B')
     print('BERT single aug:')
     print_table(res['B']['single+aug'], task='B')
     print('NBSVM: {0}'.format(res['B']['nbsvm']))
@@ -277,3 +275,17 @@ def train():
     train_bert(pair=False, max_len=CONFIG['single_max_len'], aug=True)
     # for bert classifier
     train_bert(pair=False, max_len=CONFIG['pair_max_len'], clf=True)
+
+
+def calculate_acc_for_each_class(pred, label):
+    N0, N1, N2 = label.count(0), label.count(1), label.count(2)
+    dic = {
+        0: 0,
+        1: 0,
+        2: 0,
+    }
+    for l, p in zip(label, pred):
+        if l == p:
+            dic[l] += 1
+    print("label 0: {}, label 1: {}, label 2: {}".format(
+        dic[0]/N0, dic[1]/N1, dic[2]/N2))
