@@ -262,7 +262,7 @@ def train_bert(pair=False, model='bert-base-cased', max_len=CONFIG['single_max_l
     for i in range(1, 5):
             for j in [32, 16, 8, 4]:
                 My_BERT(
-                    pair=pair, model_name=model, max_len=max_len, aug=aug, clf=clf).fineT(epochs=i, bs=j, verbose=False)
+                    pair=pair, model_name=model, max_len=max_len, aug=aug, clf=clf).fineT(epochs=i, bs=j, verbose=True)
 
 
 def train():
